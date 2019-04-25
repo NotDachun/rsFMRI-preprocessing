@@ -476,7 +476,7 @@ def run():
 	Runs this script
 
 	"""
-	mni = "MNI152_T1_2mm_SSW.nii.gz"
+	mni = "MNI152_T1_2mm_SSW.nii"
 
 	args = parse_args(sys.argv[1:])
 
