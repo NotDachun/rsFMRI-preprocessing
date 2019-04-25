@@ -17,11 +17,12 @@ Rationale:
 ToDo:
 	-Test parse_args
 	-Test override ability
-	-Move files to correct folder
 	-Test EPI on MNI snapshot
-	-Create dynamic DMN QC
-	-Support blur only in gray matter
-	-Convert result to nifti and rename
+	-Test creation of dynamic DMN QC
+	-Test blur only in gray matter
+	-Test result to nifti and rename
+		-Build name
+	-Move files to correct folder
 """
 
 import argparse
@@ -63,6 +64,19 @@ def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
 		True if floats are equal, otherwise false
 	"""
 	return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+
+def cpe_output(exception, text):
+	"""
+	Error message to be printed when a CalledProcessError is raised
+
+	Parameters:
+		exception (CallProcessError): caught exception
+		text (String): error message to be printed
+	"""
+	record("Error raised on command: ")
+	record(exception.cmd)				
+	record(exception.output)
+	record(text)
 
 def parse_args(args):
 	"""
@@ -151,6 +165,8 @@ def create_outdir(out_dir):
 	    os.makedirs(output_dir)
 	else:
 		record("Output directory already exists")
+
+	assert os.path.isdir(output_dir), "Output directory was not created"
 	return output_dir
 
 def run_SSwarper(out_dir, subj_id, anat, template):
@@ -186,12 +202,21 @@ def run_SSwarper(out_dir, subj_id, anat, template):
 			shutil.rmtree(sswarper_outdir)
 		os.makedirs(sswarper_outdir)
 
-		record(subprocess.check_output([
-		    "@SSwarper",
-		    "-input", anat,
-		    "-base", template,
-		    "-subid", subj_id,
-		    "-odir", sswarper_outdir], stderr=subprocess.STDOUT))
+		try: 
+			record(subprocess.check_output([
+			    "@SSwarper",
+			    "-input", anat,
+			    "-base", template,
+			    "-subid", subj_id,
+			    "-odir", sswarper_outdir], stderr=subprocess.STDOUT))
+
+		except subprocess.CalledProcessError as e:
+			cpe_output(e, "@SSWarper failed.")
+
+	assert os.path.isdir(sswarper_outdir)
+	assert os.path.isfile(sswarper_outdir + "anatQQ.{}.nii".format(subj_id))
+	assert os.path.isfile(sswarper_outdir + "anatQQ.{}.aff12.1D".format(subj_id))
+	assert os.path.isfile(sswarper_outdir + "anatQQ.{}_WARP.nii".format(subj_id))
 
 def truncate_epi(epi, out_dir, volumes):
 	"""
@@ -222,17 +247,42 @@ def truncate_epi(epi, out_dir, volumes):
 
 		# Use afni's 3dTcat to truncate epi to inputted number of volumes
 		# Equivalent to shell command: 3dTcat -prefix "${outdir}/to990" $epi'[0..989]
-		record(subprocess.check_output([
-			"3dTcat -prefix {} {}'[0..{}]'".format(epi_toVolumes, epi, volumes - 1)], 
-			shell=True, stderr=subprocess.STDOUT))
-		epi_toVolumes += "+orig."
-		epi = epi_toVolumes
+		try:
+			record(subprocess.check_output([
+				"3dTcat -prefix {} {}'[0..{}]'".format(epi_toVolumes, epi, volumes - 1)], 
+				shell=True, stderr=subprocess.STDOUT))
+			epi_toVolumes += "+orig."
+			epi = epi_toVolumes
+		except subprocess.CalledProcessError as e:
+			cpe_output(e, "3dTcat failed.")
 
-	check_vol = int(subprocess.check_output([
-		"3dinfo", "-nv", epi]))
+	try:
+		check_vol = int(subprocess.check_output([
+			"3dinfo", "-nv", epi]))
+	except subprocess.CalledProcessError as e:
+		cpe_output(e, "EPI does not exist") 
+	
 	assert (check_vol == volumes), "TCat EPI does not have the correct number of volumes"
-
 	return epi
+
+def set_gm_mask(rsproc):
+	"""
+	Modifies a RSproc file by supplying the grey matter mask as an input to the blur_in_mask
+	function
+
+	Parameters:
+		rsproc (String): Path to the RSproc
+	"""
+
+	assert os.path.isfile(rsproc), "File does not exist"
+
+	with open(rsproc, "r") as file:
+		filedata = file.read()
+
+	filedata = filedata.replace("-Mmask full_mask.$subj+tlrc", "-mask mask_GM_resam+tlrc")
+
+	with open(rsproc, "w") as file:
+		file.write(filedata)
 
 def generate_afni_proc(args, template):
 	"""
@@ -244,6 +294,8 @@ def generate_afni_proc(args, template):
 	Returns:
 		afni_proc.py script in list format separated by spaces
 	"""
+
+	assert os.path.isfile(template), "Template does not exist"
 
 	sswarper_outdir = args.out_dir + ("/" if args.out_dir[-1] != "/" else "") + "SSwarper_Output/"
 
@@ -274,8 +326,15 @@ def generate_afni_proc(args, template):
 			sswarper_outdir + "anatQQ.{}.aff12.1D".format(args.subj_id),
 			sswarper_outdir + "anatQQ.{}_WARP.nii".format(args.subj_id)])
 
+	# If blurring only in grey matter, supply the blur in mask option.
+	# But this does not supply the grey matter mask, must call set_gm_mask
+	# afterwards to correctly modify the RSproc script to use the AFNI
+	# generated grey matter mask.
+	afni_proc.extend(["-blur_size", str(args.fwhm)])
+	if args.gm_blur:
+		afni_proc.extend(["-blur_in_mask", "yes"])
+
 	afni_proc.extend([
-		"-blur_size", str(args.fwhm),
 		"-mask_segment_anat", "yes",
 		"-mask_segment_erode", "yes",
 		"-regress_motion_per_run",
@@ -308,6 +367,9 @@ def set_epi_tr(epi, tr):
 		tr (float): The time step
 	"""
 
+	assert (os.path.isfile(epi))
+	assert (tr > 0)
+
 	record("Ensuring TR in EPI header info is correct.")
 	# Equivalent to shell command: 3dinfo -tr $epi
 	curr_tr = float(subprocess.check_output(["3dinfo", "-tr", epi]))
@@ -322,32 +384,79 @@ def set_epi_tr(epi, tr):
 
 	assert (isclose(check_tr, tr)), "TR was not modified correctly"
 
-def create_EM_snapshot(final_epi, subj_id, template):
+def create_EM_snapshot(volreg_epi, subj_id, out_dir, template):
 	"""
 	Creates a snapshot to check for alignment between the processed epi and
 	an inputted template
 
 	Parameters:
-		final_epi (String): Path to the processed epi
+		volreg_epi (String): Path to the processed epi
 		subj_id (String): Subject id
+		out_dir (String): Path to output directory
 		template (String): Path to the template that was used for registration
 	"""
-	# Equivalent to shell command: @snapshot_volreg $template $subj.results/pb03.$subj.r01.volreg+tlrc. EM_$subj.jpg
-	# Names snapshot EM_$subj.jpg
-	try:
-		record(subprocess.check_output([
-		"@snapshot_volreg", template, final_epi, "EM_{}.jpg".format(subj_id)], stderr=subprocess.STDOUT))
-	except subprocess.CalledProcessError as e:
-		record(e.output)
-		record("Error creating creating the EPI on MNI registration snapshot")
 
-def create_static_DMN(subj_id, epi, out_dir, seed):
+	assert (os.path.isfile(volreg_epi + "HEAD"))
+	assert (os.path.isfile(volreg_epi + "BRIK"))
+	assert (os.path.isdir(out_dir))
+	assert (os.path.isfile(template))
+
+	try:
+		# Equivalent to shell command: @snapshot_volreg $template $subj.results/pb03.$subj.r01.volreg+tlrc. $outdir/EM_$subj.jpg
+		# Names snapshot EM_$subj.jpg
+		record(subprocess.check_output([
+		"@snapshot_volreg", template, volreg_epi, out_dir + "EM_{}.jpg".format(subj_id)], stderr=subprocess.STDOUT))
+	except subprocess.CalledProcessError as e:
+		cpe_output(e, "Error creating the EPI on MNI registration snapshot")
+
+def create_seed_based_network(epi, out_dir, seed):
+	"""
+	Seed based analysis - Creates a correlation map based on the time course 
+	of the seed region.
+
+	Parameters:
+		epi (String): Path to the processed EPI data
+		out_dir (String): Path to the output directory
+		seed (String): Path to a seed ROI in NIFTI format
+	"""
+	assert (os.path.isfile(epi))
+	assert (os.path.isfile(seed))
+	assert (os.path.isdir(out_dir))
+
+	record("Creating seed based correlation map")
 	data, seed, header = dc.read_data(epi, seed)
 	seed_tc = dc.extract_seed_tc(seed, data)
 	correlation = dc.calculate_static_corr(seed_tc, data)
 	output_name = os.path.basename(epi)
 	output_name = output_name[:output_name.find(".nii")]
 	dc.save_output(correlation, header, output_name + "_DMNStaticCorr", out_dir)
+
+def afni_to_nifti(afni_file, name=""):
+	"""
+	Converts an AFNI file format (.HEAD/.BRIK) to NIFTI file format (.nii).
+	Names the outputed NIFTI file if passed a name parameter
+
+	Parameter:
+		afni_file (String): Path to the file in AFNI format
+		name (String): Name of converted file
+	"""
+
+	assert (os.path.isfile(afni_file))
+
+	record("Converting from AFNI to NIFTI")
+	try:
+		# Equivalent to shell command: 
+		# 3dAFNItoNIFTI -prefix $name $afni_file 
+		command = ["3dAFNItoNIFTI"]
+		if name:
+			command.extend(["-prefix", name])
+		command.append(afni_file)
+		record(subprocess.check_output(command, stderr=subprocess.STDOUT))
+
+	except subprocess.CalledProcessError as e:
+		cpe_output(e, "Error converting file to NIFTI")
+
+
 
 def clean(subj_id):
 	"""
@@ -378,7 +487,8 @@ def run():
 	# outdir = outdir/Processed/
 	args.out_dir = create_outdir(args.out_dir)
 
-	result = args.out_dir + "{}.results/errts.{}.tproject+tlrc".format(args.subj_id, subj_id)
+	afni_final = "{}.results/errts.{}.tproject+tlrc".format(args.subj_id, subj_id)
+	result = args.out_dir + afni_final
 	if (os.path.isfile(result + ".HEAD") and os.path.isfile(result + ".BRIK")
 		and not args.rerun):
 		record("Data has already been preprocessed.")
@@ -401,13 +511,17 @@ def run():
 		if args.time_step:
 			set_epi_tr(args.epi, args.time_step)
 
-		afni_proc = generate_afni_proc(args, mni)
+		afni_proc, name = generate_afni_proc(args, mni)
 		# Execute afni_proc.py, creates RSproc.$subj script
 		record(subprocess.check_output(afni_proc, stderr=subprocess.STDOUT))
 
+		rsproc = "RSproc.{}".format(args.subj_id)
+		if args.gm_blur:
+			set_gm_mask(rsproc)
 		# Execute RSproc.$subj
-		record(subprocess.check_output(["tcsh", "-xef", "RSproc.{}".format(args.subj_id)]), stderr=subprocess.STDOUT)
+		record(subprocess.check_output(["tcsh", "-xef", rsproc]), stderr=subprocess.STDOUT)
 
+		afni_to_nifti(afni_final, name)
 if __name__ == "__main__":
 	run()
 	
