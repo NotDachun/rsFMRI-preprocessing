@@ -15,9 +15,7 @@ Rationale:
     -Ability to do unit testing
 
 ToDo:
-	-Test parse_args
 	-Test override ability
-	-Test EPI on MNI snapshot
 	-Test creation of dynamic DMN QC
 	-Test blur only in gray matter
 	-Test result to nifti and rename
@@ -85,7 +83,7 @@ def parse_args(args):
 	View help for valid flags and inputs.
 
 	Parameters:
-		args (List): A list of arguments appropiate to the parser
+		args (List): A list of arguments appropriate to the parser, often just sys.argv[-1:]
 	Returns:
 		A Namespace object that maps flags to their value according to the inputted args
 	"""
@@ -115,13 +113,14 @@ def parse_args(args):
 						help="set the time step for bandpassing (default = ts in header info")
 
 
+	parser.add_argument("-g", "--global_signal_regression", action="store_false", default=True,
+						help="do not perform global signal regression (default = perform gsr)")		
+
 	parser.add_argument("-r", "--rerun", action="store_true", default=False,
 	                    help="""rerun preprocessing, override and delete previous results in 
 	                    'Processed' folder (default = don't override)""")
 	parser.add_argument("-m", "--motion_param", action="store_true", default=False,
 	                    help="use 12 motion parameters for regression (default = 6 motion parameters)")
-	parser.add_argument("-g", "--global_signal_regression", action="store_false", default=True,
-						help="perform global signal regression (default = perform gsr)")
 	parser.add_argument("-G", "--gm_blur", action="store_true", default=False,
 	                     help="blur only in grey matter mask (default = blur in whole brain)")
 	parser.add_argument("-n", "--nl_reg", action="store_true", default=False,
@@ -159,7 +158,7 @@ def create_outdir(out_dir):
 	Returns:
 		Path to the created output directory. Should be of form "out_dir/Processed"
 	"""
-	output_dir = out_dir + ("/" if out_dir[-1] != "/" else "") + "Processed/"
+	output_dir = os.path.join(out_dir, "Processed/")
 	if not os.path.exists(output_dir):
 	    record("Creating output directory: " + output_dir)
 	    os.makedirs(output_dir)
@@ -185,7 +184,7 @@ def run_SSwarper(out_dir, subj_id, anat, template):
 	assert (os.path.isfile(anat)), "Path to anatomical data does not exist"
 	assert (os.path.isfile(template)), "Path to template does not exist"
 
-	sswarper_outdir = out_dir + ("/" if out_dir[-1] != "/" else "") + "SSwarper_Output/"
+	sswarper_outdir = os.path.join(out_dir, "SSwarper_Output/")
 
     # Check if desired output exists already
 	if (os.path.isdir(sswarper_outdir) and
@@ -237,8 +236,7 @@ def truncate_epi(epi, out_dir, volumes):
 
 	# Use afni's 3dinfo to check number of volumes in epi
 	# Equivalent to shell command: 3dinfo -nv $epi
-	subj_vol = int(subprocess.check_output([
-		"3dinfo", "-nv", epi]))
+	subj_vol = int(subprocess.check_output(["3dinfo", "-nv", epi]))
 	record("The current number of volumes is {}".format(subj_vol))
 
 	if (subj_vol > volumes):
@@ -297,7 +295,7 @@ def generate_afni_proc(args, template):
 
 	assert os.path.isfile(template), "Template does not exist"
 
-	sswarper_outdir = args.out_dir + ("/" if args.out_dir[-1] != "/" else "") + "SSwarper_Output/"
+	sswarper_outdir = os.path.join(args.out_dir, "SSwarper_Output/")
 
 	# Create afni_proc.py shell command
 	record("Generating afni_proc.py script")
@@ -405,14 +403,15 @@ def create_EM_snapshot(volreg_epi, subj_id, out_dir, template):
 		# Equivalent to shell command: @snapshot_volreg $template $subj.results/pb03.$subj.r01.volreg+tlrc. $outdir/EM_$subj.jpg
 		# Names snapshot EM_$subj.jpg
 		record(subprocess.check_output([
-		"@snapshot_volreg", template, volreg_epi, out_dir + "EM_{}.jpg".format(subj_id)], stderr=subprocess.STDOUT))
+		"@snapshot_volreg", template, volreg_epi, os.path.join(out_dir, "EM_{}.jpg".format(subj_id))], stderr=subprocess.STDOUT))
 	except subprocess.CalledProcessError as e:
 		cpe_output(e, "Error creating the EPI on MNI registration snapshot")
 
 def create_seed_based_network(epi, out_dir, seed):
 	"""
 	Seed based analysis - Creates a correlation map based on the time course 
-	of the seed region.
+	of the seed region. Will create intermediate directories when saving to 
+	output directory.
 
 	Parameters:
 		epi (String): Path to the processed EPI data
@@ -421,7 +420,6 @@ def create_seed_based_network(epi, out_dir, seed):
 	"""
 	assert (os.path.isfile(epi))
 	assert (os.path.isfile(seed))
-	assert (os.path.isdir(out_dir))
 
 	record("Creating seed based correlation map")
 	data, seed, header = dc.read_data(epi, seed)
@@ -488,7 +486,7 @@ def run():
 	args.out_dir = create_outdir(args.out_dir)
 
 	afni_final = "{}.results/errts.{}.tproject+tlrc".format(args.subj_id, subj_id)
-	result = args.out_dir + afni_final
+	result = os.path.join(args.out_dir, afni_final)
 	if (os.path.isfile(result + ".HEAD") and os.path.isfile(result + ".BRIK")
 		and not args.rerun):
 		record("Data has already been preprocessed.")
