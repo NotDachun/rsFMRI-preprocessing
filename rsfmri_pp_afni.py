@@ -7,6 +7,7 @@ Created on Tue Apr  9 19:22:36 2019
 @author: dzhu99
 
 Resting state fMRI preprocessing script rewritten in Python
+Call this script using: python rsfmri_pp_afni.py [options]
 
 Rationale:
     -More tool support
@@ -16,11 +17,8 @@ Rationale:
 
 ToDo:
 	-Test override ability
-	-Test creation of dynamic DMN QC
-	-Test blur only in gray matter
-	-Test result to nifti and rename
-		-Build name
-	-Move files to correct folder
+
+	-Run preprocessing on multiple subjects
 """
 
 import argparse
@@ -34,8 +32,9 @@ from multiprocessing import cpu_count
 
 # All output is written to rsfmri_pp_afni_output.txt for verification
 # in case errors occur
-name = os.path.basename(__file__)
-output_file = open(name[:name.find(".py")] + "_output.txt", "w")
+file = os.path.basename(__file__)
+file = file[:file.find(".py")] + "_output.txt"
+output_file = open(file, "w")
 
 def record(text):
 	"""
@@ -188,9 +187,9 @@ def run_SSwarper(out_dir, subj_id, anat, template):
 
     # Check if desired output exists already
 	if (os.path.isdir(sswarper_outdir) and
-        os.path.isfile(sswarper_outdir + "anatQQ.{}.nii".format(subj_id)) and
-        os.path.isfile(sswarper_outdir + "anatQQ.{}.aff12.1D".format(subj_id)) and
-        os.path.isfile(sswarper_outdir + "anatQQ.{}_WARP.nii".format(subj_id))):
+        os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.nii".format(subj_id))) and
+        os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.aff12.1D".format(subj_id))) and
+        os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}_WARP.nii".format(subj_id)))):
 		record("@SSwarper has already been performed")
 
 	else:
@@ -213,9 +212,9 @@ def run_SSwarper(out_dir, subj_id, anat, template):
 			cpe_output(e, "@SSWarper failed.")
 
 	assert os.path.isdir(sswarper_outdir)
-	assert os.path.isfile(sswarper_outdir + "anatQQ.{}.nii".format(subj_id))
-	assert os.path.isfile(sswarper_outdir + "anatQQ.{}.aff12.1D".format(subj_id))
-	assert os.path.isfile(sswarper_outdir + "anatQQ.{}_WARP.nii".format(subj_id))
+	assert os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.nii".format(subj_id)))
+	assert os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.aff12.1D".format(subj_id)))
+	assert os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}_WARP.nii".format(subj_id)))
 
 def truncate_epi(epi, out_dir, volumes):
 	"""
@@ -290,11 +289,13 @@ def generate_afni_proc(args, template):
 		args (Namespace): Container that holds the desired parameters for preprocessing that are mapped to flags
 		template: The template that will be the base for alignment
 	Returns:
-		afni_proc.py script in list format separated by spaces
+		afni_proc.py script in list format separated by spaces.
+		A name that corresponds to the preprocessing steps, used by to rename the output later
 	"""
 
 	assert os.path.isfile(template), "Template does not exist"
 
+	name = "rsfmri_despike_toMNI_"
 	sswarper_outdir = os.path.join(args.out_dir, "SSwarper_Output/")
 
 	# Create afni_proc.py shell command
@@ -304,8 +305,18 @@ def generate_afni_proc(args, template):
 	"-subj_id", args.subj_id,
 	"-script", "RSproc.{}".format(args.subj_id), "-scr_overwrite",
 	"-blocks", "despike", "align", "tlrc", "volreg", "mask", "blur", "scale", "regress",
-	"-copy_anat", sswarper_outdir + "anatSS.{}.nii".format(args.subj_id),
-	"-anat_has_skull", "no",
+	"-copy_anat"]
+	
+	if args.nl_reg:
+		assert (os.path.isfile(os.path.join(sswarper_outdir, "anatSS.{}.nii".format(args.subj_id))))
+
+		afni_proc.append(os.path.join(sswarper_outdir, "anatSS.{}.nii".format(args.subj_id)))
+	else:
+		assert (os.path.isfile(args.anat))
+
+		afni_proc.append(args.anat)
+
+	afni_proc.extend(["-anat_has_skull", "no",
 	"-dsets", args.epi,
 	"-tcat_remove_first_trs", str(args.trs_remove),
 	"-align_opts_aea", "-giant_move", "-cost", "lpc+zz",
@@ -313,24 +324,27 @@ def generate_afni_proc(args, template):
 	"-volreg_align_e2a",
 	"-volreg_tlrc_warp",
 	"-tlrc_base", template,
-	"-volreg_warp_dxyz", str(args.dim_voxel)]
+	"-volreg_warp_dxyz", str(args.dim_voxel)])
 
 	# Pass SSwarper output to afni_proc.py
 	if args.nl_reg:
 		afni_proc.extend([
 			"-tlrc_NL_warp",
 			"-tlrc_NL_warped_dsets",
-			sswarper_outdir + "anatQQ.{}.nii".format(args.subj_id),
-			sswarper_outdir + "anatQQ.{}.aff12.1D".format(args.subj_id),
-			sswarper_outdir + "anatQQ.{}_WARP.nii".format(args.subj_id)])
+			os.path.join(sswarper_outdir, "anatQQ.{}.nii".format(args.subj_id)),
+			os.path.join(sswarper_outdir, "anatQQ.{}.aff12.1D".format(args.subj_id)),
+			os.path.join(sswarper_outdir, "anatQQ.{}_WARP.nii".format(args.subj_id))])
 
 	# If blurring only in grey matter, supply the blur in mask option.
 	# But this does not supply the grey matter mask, must call set_gm_mask
 	# afterwards to correctly modify the RSproc script to use the AFNI
 	# generated grey matter mask.
 	afni_proc.extend(["-blur_size", str(args.fwhm)])
+	name += str(args.fwhm) + "mmSmooth_"
+
 	if args.gm_blur:
 		afni_proc.extend(["-blur_in_mask", "yes"])
+
 
 	afni_proc.extend([
 		"-mask_segment_anat", "yes",
@@ -338,6 +352,7 @@ def generate_afni_proc(args, template):
 		"-regress_motion_per_run",
 		"-regress_bandpass", str(args.bandpass[0]), str(args.bandpass[1]),
 		"-regress_apply_mot_types", "demean"])
+	name += "bandpass_"
 
 	# Regress 12 motion parameters
 	if args.motion_param:
@@ -346,6 +361,7 @@ def generate_afni_proc(args, template):
 	# Global Signal Regression
 	if args.global_signal_regression:
 		afni_proc.extend(["-regress_ROI", "brain"])
+		name += "gsregress_"
 
 
 	afni_proc.extend([
@@ -354,7 +370,11 @@ def generate_afni_proc(args, template):
 		"-regress_run_clustsim", "no"])
 
 	assert (all(isinstance(param, str) for param in afni_proc)), "Not all parameters are strings"
-	return afni_proc
+
+	if name[-1] == "_":
+		name = name[:-1]
+
+	return afni_proc, name
 
 def set_epi_tr(epi, tr):
 	"""
@@ -439,7 +459,8 @@ def afni_to_nifti(afni_file, name=""):
 		name (String): Name of converted file
 	"""
 
-	assert (os.path.isfile(afni_file))
+	assert (os.path.isfile(afni_file + "HEAD"))
+	assert (os.path.isfile(afni_file + "BRIK"))
 
 	record("Converting from AFNI to NIFTI")
 	try:
@@ -454,7 +475,19 @@ def afni_to_nifti(afni_file, name=""):
 	except subprocess.CalledProcessError as e:
 		cpe_output(e, "Error converting file to NIFTI")
 
+def move_to_outdir(out_dir, *args):
+	"""
+	Moves any number of files into out_dir
 
+	Parameters:
+		*args (String): Path to files
+		out_dir (String): Path to the output directory
+	"""
+
+	assert (os.path.isdir(out_dir))
+
+	for file in args:
+		shutil.move(file, out_dir)
 
 def clean(subj_id):
 	"""
@@ -484,9 +517,10 @@ def run():
 
 	# outdir = outdir/Processed/
 	args.out_dir = create_outdir(args.out_dir)
-
-	afni_final = "{}.results/errts.{}.tproject+tlrc".format(args.subj_id, subj_id)
+	results_dir = "{}.results".format(args.subj_id)
+	afni_final = os.path.join(results_dir, "errts.{}.tproject+tlrc".format(subj_id))
 	result = os.path.join(args.out_dir, afni_final)
+
 	if (os.path.isfile(result + ".HEAD") and os.path.isfile(result + ".BRIK")
 		and not args.rerun):
 		record("Data has already been preprocessed.")
@@ -511,15 +545,27 @@ def run():
 
 		afni_proc, name = generate_afni_proc(args, mni)
 		# Execute afni_proc.py, creates RSproc.$subj script
-		record(subprocess.check_output(afni_proc, stderr=subprocess.STDOUT))
+		try:
+			record(subprocess.check_output(afni_proc, stderr=subprocess.STDOUT))
+		except subprocess.CalledProcessError as e:
+			cpe_output(e, "Failed to generate RSproc.")
 
 		rsproc = "RSproc.{}".format(args.subj_id)
 		if args.gm_blur:
 			set_gm_mask(rsproc)
-		# Execute RSproc.$subj
-		record(subprocess.check_output(["tcsh", "-xef", rsproc]), stderr=subprocess.STDOUT)
 
+		# Execute RSproc.$subj
+		try:
+			record(subprocess.check_output(["tcsh", "-xef", rsproc]), stderr=subprocess.STDOUT)
+		except subprocess.CalledProcessError as e:
+			cpe_output(e, "Preprocessing failed in RSproc")
+
+		# Rename and convert errts.tproject and move $sub.results
 		afni_to_nifti(afni_final, name)
+		shutil.move(name + ".nii", results_dir)
+
+		record("Finished preprocessing, moving results to output directory")
+		move_to_outdir(args.out_dir, rsproc, file, results_dir)
 if __name__ == "__main__":
 	run()
 	
