@@ -1,6 +1,8 @@
 from rsfmri_pp_afni import PreprocessingPipeline
 from multiprocessing import cpu_count
 import argparse
+import os
+import numpy as np
 import sys
 
 def parse_args(args):
@@ -85,17 +87,17 @@ if __name__ == "__main__":
     pipeline = PreprocessingPipeline("preprocessing_output.txt")
 
     with open(args.epi, "r") as epi, open(args.anat, "r") as anat, open(args.out_dir, "r") as out_dir:
-        if not args.sub == "sub":
+        if not args.subj_id == "sub":
             with open(args.subj_id, "r") as sub:
                 for e, a, o, s in zip(epi, anat, out_dir, sub):
                     args.epi = e.strip()
                     args.anat = a.strip()
                     args.out_dir = o.strip()
                     args.sub = s.strip()
-                    preprocessor.run(args)
+                    pipeline.run(args)
         else:
             for e, a, o in zip(epi, anat, out_dir):
                 args.epi = e.strip()
                 args.anat = a.strip()
                 args.out_dir = o.strip()
-                preprocessor.run(args)
+                pipeline.run(args)
