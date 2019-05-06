@@ -30,12 +30,6 @@ import numpy as np
 import dynamic_connectivity as dc
 from multiprocessing import cpu_count
 
-# All output is written to rsfmri_pp_afni_output.txt for verification
-# in case errors occur
-file = os.path.basename(__file__)
-file = file[:file.find(".py")] + "_output.txt"
-output_file = open(file, "w")
-
 def record(text):
 	"""
 	Prints to both console and the specified output file 
@@ -183,7 +177,7 @@ def run_SSwarper(out_dir, subj_id, anat, template):
 	assert (os.path.isfile(anat)), "Path to anatomical data does not exist"
 	assert (os.path.isfile(template)), "Path to template does not exist"
 
-	sswarper_outdir = os.path.join(out_dir, "SSwarper_Output/")
+	sswarper_outdir = os.path.join(out_dir, "SSwarper_Output")
 
     # Check if desired output exists already
 	if (os.path.isdir(sswarper_outdir) and
@@ -408,7 +402,7 @@ def create_EM_snapshot(volreg_epi, subj_id, out_dir, template):
 	an inputted template
 
 	Parameters:
-		volreg_epi (String): Path to the processed epi
+		volreg_epi (String): Path to the epi after volume registration step
 		subj_id (String): Subject id
 		out_dir (String): Path to output directory
 		template (String): Path to the template that was used for registration
@@ -472,6 +466,8 @@ def afni_to_nifti(afni_file, name=""):
 		command.append(afni_file)
 		record(subprocess.check_output(command, stderr=subprocess.STDOUT))
 
+		return name + ".nii"
+
 	except subprocess.CalledProcessError as e:
 		cpe_output(e, "Error converting file to NIFTI")
 
@@ -507,34 +503,33 @@ def run():
 	Runs this script
 
 	"""
-	mni = "MNI152_T1_2mm_SSW.nii"
-
+	mni = "MNI152_T1_1mm_SSW.nii"
+	seed = "FIND_pCC.nii"
 	args = parse_args(sys.argv[1:])
 
 	clean(args.subj_id)
 
-	os.environ['OMP_NUM_THREADS'] = args.cores
+	os.environ['OMP_NUM_THREADS'] = str(args.cores)
 
 	# outdir = outdir/Processed/
 	args.out_dir = create_outdir(args.out_dir)
 	results_dir = "{}.results".format(args.subj_id)
-	afni_final = os.path.join(results_dir, "errts.{}.tproject+tlrc".format(subj_id))
+	afni_final = os.path.join(results_dir, "errts.{}.tproject+tlrc.".format(args.subj_id))
 	result = os.path.join(args.out_dir, afni_final)
 
-	if (os.path.isfile(result + ".HEAD") and os.path.isfile(result + ".BRIK")
+	if (os.path.isfile(result + "HEAD") and os.path.isfile(result + "BRIK")
 		and not args.rerun):
 		record("Data has already been preprocessed.")
 		record("Results of preprocessing are the following files: ")
-		record(result + ".HEAD")
-		record(result + ".BRIK")
+		record(result + "HEAD")
+		record(result + "BRIK")
 		record("Use flag -r/--rerun to override results and rerun the preprocessing")
 		return
 	
 	else:
-		if os.path.isdir(args.out_dir):
-			record("Overriding and deleting previous 'Processed' directory.")
-			shutil.rmtree(args.out_dir)
-		os.mkdir(args.out_dir)
+		if os.path.isdir(os.path.join(args.out_dir, results_dir)):
+			record("Overriding and deleting: {}". format(os.path.join(args.out_dir, results_dir)))
+			shutil.rmtree(os.path.join(args.out_dir, results_dir))
 
 		if args.nl_reg:
 			run_SSwarper(args.out_dir, args.subj_id, args.anat, mni)
@@ -556,16 +551,31 @@ def run():
 
 		# Execute RSproc.$subj
 		try:
-			record(subprocess.check_output(["tcsh", "-xef", rsproc]), stderr=subprocess.STDOUT)
+			record(subprocess.check_output(["tcsh", "-xef", rsproc], stderr=subprocess.STDOUT))
 		except subprocess.CalledProcessError as e:
 			cpe_output(e, "Preprocessing failed in RSproc")
 
 		# Rename and convert errts.tproject and move $sub.results
-		afni_to_nifti(afni_final, name)
-		shutil.move(name + ".nii", results_dir)
+		name = afni_to_nifti(afni_final, name)
+
+		create_seed_based_network(name, args.out_dir, seed)
+		shutil.move(name, results_dir)
+
+
+		create_EM_snapshot(os.path.join(results_dir, "pb02.{}.r01.volreg+tlrc.".format(args.subj_id)), 
+			args.subj_id, args.out_dir, mni)
 
 		record("Finished preprocessing, moving results to output directory")
 		move_to_outdir(args.out_dir, rsproc, file, results_dir)
+
+
 if __name__ == "__main__":
+
+	# All output is written to rsfmri_pp_afni_output.txt for verification
+	# in case errors occur
+	file = os.path.basename(__file__)
+	file = file[:file.find(".py")] + "_output.txt"
+	output_file = open(file, "w")
+
 	run()
 	
