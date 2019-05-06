@@ -74,10 +74,10 @@ class PreprocessingPipeline(object):
                 exception (CallProcessError): caught exception
                 text (String): error message to be printed
         """
-        record("Error raised on command: ")
-        record(exception.cmd)
-        record(exception.output)
-        record(text)
+        self.record("Error raised on command: ")
+        self.record(exception.cmd)
+        self.record(exception.output)
+        self.record(text)
 
     def create_outdir(self, out_dir):
         """
@@ -92,10 +92,10 @@ class PreprocessingPipeline(object):
 
         output_dir = os.path.join(out_dir, "Processed/")
         if not os.path.exists(output_dir):
-            record("Creating output directory: " + output_dir)
+            self.record("Creating output directory: " + output_dir)
             os.makedirs(output_dir)
         else:
-            record("Output directory already exists")
+            self.record("Output directory already exists")
 
         assert os.path.isdir(output_dir), "Output directory was not created"
         return output_dir
@@ -123,18 +123,18 @@ class PreprocessingPipeline(object):
             os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.nii".format(subj_id))) and
             os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.aff12.1D".format(subj_id))) and
                 os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}_WARP.nii".format(subj_id)))):
-            record("@SSwarper has already been performed")
+            self.record("@SSwarper has already been performed")
 
         else:
-            record("Performing @SSwarper")
-            record("Creating " + sswarper_outdir)
+            self.record("Performing @SSwarper")
+            self.record("Creating " + sswarper_outdir)
 
             if os.path.exists(sswarper_outdir):
                 shutil.rmtree(sswarper_outdir)
             os.makedirs(sswarper_outdir)
 
             try:
-                record(subprocess.check_output([
+                self.record(subprocess.check_output([
                     "@SSwarper",
                     "-input", anat,
                     "-base", template,
@@ -142,7 +142,7 @@ class PreprocessingPipeline(object):
                     "-odir", sswarper_outdir], stderr=subprocess.STDOUT))
 
             except subprocess.CalledProcessError as e:
-                cpe_output(e, "@SSWarper failed.")
+                self.cpe_output(e, "@SSWarper failed.")
 
         assert os.path.isdir(sswarper_outdir)
         assert os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.nii".format(subj_id)))
@@ -169,28 +169,28 @@ class PreprocessingPipeline(object):
         # Use afni's 3dinfo to check number of volumes in epi
         # Equivalent to shell command: 3dinfo -nv $epi
         subj_vol = int(subprocess.check_output(["3dinfo", "-nv", epi]))
-        record("The current number of volumes is {}".format(subj_vol))
+        self.record("The current number of volumes is {}".format(subj_vol))
 
         if (subj_vol > volumes):
-            record("Truncating to first {} volumes".format(volumes))
+            self.record("Truncating to first {} volumes".format(volumes))
             epi_toVolumes = out_dir + "to{}".format(volumes)
 
             # Use afni's 3dTcat to truncate epi to inputted number of volumes
             # Equivalent to shell command: 3dTcat -prefix "${outdir}/to990" $epi'[0..989]
             try:
-                record(subprocess.check_output([
+                self.record(subprocess.check_output([
                     "3dTcat -prefix {} {}'[0..{}]'".format(epi_toVolumes, epi, volumes - 1)],
                     shell=True, stderr=subprocess.STDOUT))
                 epi_toVolumes += "+orig."
                 epi = epi_toVolumes
             except subprocess.CalledProcessError as e:
-                cpe_output(e, "3dTcat failed.")
+                self.cpe_output(e, "3dTcat failed.")
 
         try:
             check_vol = int(subprocess.check_output([
                 "3dinfo", "-nv", epi]))
         except subprocess.CalledProcessError as e:
-            cpe_output(e, "EPI does not exist")
+            self.cpe_output(e, "EPI does not exist")
 
         assert (check_vol == volumes), "TCat EPI does not have the correct number of volumes"
         return epi
@@ -232,7 +232,7 @@ class PreprocessingPipeline(object):
         sswarper_outdir = os.path.join(args.out_dir, "SSwarper_Output/")
 
         # Create afni_proc.py shell command
-        record("Generating afni_proc.py script")
+        self.record("Generating afni_proc.py script")
         afni_proc = [
             "afni_proc.py",
             "-subj_id", args.subj_id,
@@ -269,7 +269,7 @@ class PreprocessingPipeline(object):
                 os.path.join(sswarper_outdir, "anatQQ.{}_WARP.nii".format(args.subj_id))])
 
         # If blurring only in grey matter, supply the blur in mask option.
-        # But this does not supply the grey matter mask, must call set_gm_mask
+        # But this does not supply the grey matter mask, must call self.set_gm_mask
         # afterwards to correctly modify the RSproc script to use the AFNI
         # generated grey matter mask.
         afni_proc.extend(["-blur_size", str(args.fwhm)])
@@ -319,19 +319,19 @@ class PreprocessingPipeline(object):
         assert (os.path.isfile(epi))
         assert (tr > 0)
 
-        record("Ensuring TR in EPI header info is correct.")
+        self.record("Ensuring TR in EPI header info is correct.")
         # Equivalent to shell command: 3dinfo -tr $epi
         curr_tr = float(subprocess.check_output(["3dinfo", "-tr", epi]))
-        record("The current TR is {}".format(curr_tr))
+        self.record("The current TR is {}".format(curr_tr))
 
-        if (not isclose(curr_tr, tr)):
-            record("Modifying TR from {} to be {}".format(curr_tr, tr))
+        if (not self.isclose(curr_tr, tr)):
+            self.record("Modifying TR from {} to be {}".format(curr_tr, tr))
             # Equivalent to shell command: 3drefit -TR $epi
-            record(subprocess.check_output(["3drefit", "-TR", str(tr), epi]))
+            self.record(subprocess.check_output(["3drefit", "-TR", str(tr), epi]))
 
         check_tr = float(subprocess.check_output(["3dinfo", "-tr", epi]))
 
-        assert (isclose(check_tr, tr)), "TR was not modified correctly"
+        assert (self.isclose(check_tr, tr)), "TR was not modified correctly"
 
     def create_EM_snapshot(self, volreg_epi, subj_id, out_dir, template):
         """
@@ -353,10 +353,10 @@ class PreprocessingPipeline(object):
         try:
             # Equivalent to shell command: @snapshot_volreg $template $subj.results/pb03.$subj.r01.volreg+tlrc. $outdir/EM_$subj.jpg
             # Names snapshot EM_$subj.jpg
-            record(subprocess.check_output([
+            self.record(subprocess.check_output([
                 "@snapshot_volreg", template, volreg_epi, os.path.join(out_dir, "EM_{}.jpg".format(subj_id))], stderr=subprocess.STDOUT))
         except subprocess.CalledProcessError as e:
-            cpe_output(e, "Error creating the EPI on MNI registration snapshot")
+            self.cpe_output(e, "Error creating the EPI on MNI registration snapshot")
 
     def create_seed_based_network(self, epi, out_dir, seed):
         """
@@ -372,7 +372,7 @@ class PreprocessingPipeline(object):
         assert (os.path.isfile(epi))
         assert (os.path.isfile(seed))
 
-        record("Creating seed based correlation map")
+        self.record("Creating seed based correlation map")
         data, seed, header = dc.read_data(epi, seed)
         seed_tc = dc.extract_seed_tc(seed, data)
         correlation = dc.calculate_static_corr(seed_tc, data)
@@ -393,7 +393,7 @@ class PreprocessingPipeline(object):
         assert (os.path.isfile(afni_file + "HEAD"))
         assert (os.path.isfile(afni_file + "BRIK"))
 
-        record("Converting from AFNI to NIFTI")
+        self.record("Converting from AFNI to NIFTI")
         try:
             # Equivalent to shell command:
             # 3dAFNItoNIFTI -prefix $name $afni_file
@@ -401,10 +401,10 @@ class PreprocessingPipeline(object):
             if name:
                 command.extend(["-prefix", name])
             command.append(afni_file)
-            record(subprocess.check_output(command, stderr=subprocess.STDOUT))
+            self.record(subprocess.check_output(command, stderr=subprocess.STDOUT))
 
         except subprocess.CalledProcessError as e:
-            cpe_output(e, "Error converting file to NIFTI")
+            self.cpe_output(e, "Error converting file to NIFTI")
 
     def move_to_outdir(self, out_dir, *args):
         """
@@ -430,7 +430,7 @@ class PreprocessingPipeline(object):
         old_dir = "{}.results".format(subj_id)
 
         if (os.path.isdir(old_dir)):
-            record("Clean - Removing {}".format(old_dir))
+            self.record("Clean - Removing {}".format(old_dir))
             shutil.rmtree(old_dir)
 
     def run(self, args):
@@ -438,58 +438,58 @@ class PreprocessingPipeline(object):
         Runs this preprocessing pipeline
 
         """
-        clean(args.subj_id)
+        self.clean(args.subj_id)
 
         os.environ['OMP_NUM_THREADS'] = args.cores
 
         # outdir = outdir/Processed/
-        args.out_dir = create_outdir(args.out_dir)
+        args.out_dir = self.create_outdir(args.out_dir)
         results_dir = "{}.results".format(args.subj_id)
         afni_final = os.path.join(results_dir, "errts.{}.tproject+tlrc".format(subj_id))
         result = os.path.join(args.out_dir, afni_final)
 
         if (os.path.isfile(result + ".HEAD") and os.path.isfile(result + ".BRIK")
                 and not args.rerun):
-            record("Data has already been preprocessed.")
-            record("Results of preprocessing are the following files: ")
-            record(result + ".HEAD")
-            record(result + ".BRIK")
-            record("Use flag -r/--rerun to override results and rerun the preprocessing")
+            self.record("Data has already been preprocessed.")
+            self.record("Results of preprocessing are the following files: ")
+            self.record(result + ".HEAD")
+            self.record(result + ".BRIK")
+            self.record("Use flag -r/--rerun to override results and rerun the preprocessing")
             return
 
         else:
             if os.path.isdir(args.out_dir):
-                record("Overriding and deleting previous 'Processed' directory.")
+                self.record("Overriding and deleting previous 'Processed' directory.")
                 shutil.rmtree(args.out_dir)
             os.mkdir(args.out_dir)
 
             if args.nl_reg:
-                run_SSwarper(args.out_dir, args.subj_id, args.anat, mni)
+                self.run_SSwarper(args.out_dir, args.subj_id, args.anat, mni)
             if args.volumes:
-                args.epi = truncate_epi()
+                args.epi = self.truncate_epi()
             if args.time_step:
-                set_epi_tr(args.epi, args.time_step)
+                self.set_epi_tr(args.epi, args.time_step)
 
-            afni_proc, name = generate_afni_proc(args, mni)
+            afni_proc, name = self.generate_afni_proc(args, mni)
             # Execute afni_proc.py, creates RSproc.$subj script
             try:
-                record(subprocess.check_output(afni_proc, stderr=subprocess.STDOUT))
+                self.record(subprocess.check_output(afni_proc, stderr=subprocess.STDOUT))
             except subprocess.CalledProcessError as e:
-                cpe_output(e, "Failed to generate RSproc.")
+                self.cpe_output(e, "Failed to generate RSproc.")
 
             rsproc = "RSproc.{}".format(args.subj_id)
             if args.gm_blur:
-                set_gm_mask(rsproc)
+                self.set_gm_mask(rsproc)
 
             # Execute RSproc.$subj
             try:
-                record(subprocess.check_output(["tcsh", "-xef", rsproc]), stderr=subprocess.STDOUT)
+                self.record(subprocess.check_output(["tcsh", "-xef", rsproc]), stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:
-                cpe_output(e, "Preprocessing failed in RSproc")
+                self.cpe_output(e, "Preprocessing failed in RSproc")
 
             # Rename and convert errts.tproject and move $sub.results
-            afni_to_nifti(afni_final, name)
+            self.afni_to_nifti(afni_final, name)
             shutil.move(name + ".nii", results_dir)
 
-            record("Finished preprocessing, moving results to output directory")
-            move_to_outdir(args.out_dir, rsproc, file, results_dir)
+            self.record("Finished preprocessing, moving results to output directory")
+            self.move_to_outdir(args.out_dir, rsproc, file, results_dir)
