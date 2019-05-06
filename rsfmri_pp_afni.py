@@ -3,16 +3,21 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Apr  9 19:22:36 2019
+
 @author: dzhu99
+
 Resting state fMRI preprocessing script rewritten in Python
 Call this script using: python rsfmri_pp_afni.py [options]
+
 Rationale:
     -More tool support
     -Easier to maintain/change in the future
     -Better for larger scale programs
     -Ability to do unit testing
+
 ToDo:
     -Test override ability
+
     -Run preprocessing on multiple subjects
 """
 
@@ -39,6 +44,7 @@ class PreprocessingPipeline(object):
     def record(self, text):
         """
         Prints to both console and the specified output file 
+
         Parameters:
                 text (String): the text to be written to the console and output file
         """
@@ -49,6 +55,7 @@ class PreprocessingPipeline(object):
     def isclose(self, a, b, rel_tol=1e-09, abs_tol=0.0):
         """
         Checks if two floats are equal
+
         Parameters:
                 a (float/double): float to be checked for equivalence
                 b (float/double): float be to checked for equivalence
@@ -62,6 +69,7 @@ class PreprocessingPipeline(object):
     def cpe_output(self, exception, text):
         """
         Error message to be printed when a CalledProcessError is raised
+
         Parameters:
                 exception (CallProcessError): caught exception
                 text (String): error message to be printed
@@ -75,6 +83,7 @@ class PreprocessingPipeline(object):
         """
         Creates the output directory if it does not already exist. Intermediate
         directories will be created as well.
+
         Parameters: 
                 out_dir (String): Path to location of where output directory is created
         Returns:
@@ -94,6 +103,7 @@ class PreprocessingPipeline(object):
     def run_SSwarper(self, out_dir, subj_id, anat, template):
         """
         Runs AFNI's @SSwarper with the inputted parameters if it has not already been performed
+
         Parameters:
                 out_dir (String): Path to the output directory
                 subj_id (String): Subject id
@@ -143,6 +153,7 @@ class PreprocessingPipeline(object):
         """
         Truncates a copy of EPI data to the inputted number of volumes. Places this
         copy in the passed output directory
+
         Parameters:
                 epi (String): Path to EPI data
                 out_dir (String): Path to output directory where truncated EPI is placed
@@ -188,6 +199,7 @@ class PreprocessingPipeline(object):
         """
         Modifies a RSproc file by supplying the grey matter mask as an input to the blur_in_mask
         function
+
         Parameters:
                 rsproc (String): Path to the RSproc
         """
@@ -205,6 +217,7 @@ class PreprocessingPipeline(object):
     def generate_afni_proc(self, args, template):
         """
         Generates the afni_proc.py script according to the inputted parameters
+
         Parameters:
                 args (Namespace): Container that holds the desired parameters for preprocessing that are mapped to flags
                 template: The template that will be the base for alignment
@@ -297,6 +310,7 @@ class PreprocessingPipeline(object):
     def set_epi_tr(self, epi, tr):
         """
         Modifies the tr header information of the EPI data
+
         Parameters:
                 epi (String): Path to the EPI dat
                 tr (float): The time step
@@ -323,6 +337,7 @@ class PreprocessingPipeline(object):
         """
         Creates a snapshot to check for alignment between the processed epi and
         an inputted template
+
         Parameters:
                 volreg_epi (String): Path to the processed epi
                 subj_id (String): Subject id
@@ -348,6 +363,7 @@ class PreprocessingPipeline(object):
         Seed based analysis - Creates a correlation map based on the time course 
         of the seed region. Will create intermediate directories when saving to 
         output directory.
+
         Parameters:
                 epi (String): Path to the processed EPI data
                 out_dir (String): Path to the output directory
@@ -368,6 +384,7 @@ class PreprocessingPipeline(object):
         """
         Converts an AFNI file format (.HEAD/.BRIK) to NIFTI file format (.nii).
         Names the outputed NIFTI file if passed a name parameter
+
         Parameter:
                 afni_file (String): Path to the file in AFNI format
                 name (String): Name of converted file
@@ -392,6 +409,7 @@ class PreprocessingPipeline(object):
     def move_to_outdir(self, out_dir, *args):
         """
         Moves any number of files into out_dir
+
         Parameters:
                 *args (String): Path to files
                 out_dir (String): Path to the output directory
@@ -405,6 +423,7 @@ class PreprocessingPipeline(object):
     def clean(self, subj_id):
         """
         Removes previous {sub}.results directories from pwd
+
         Parameter:
                 subj_id (String): Subject Id
         """
@@ -417,6 +436,7 @@ class PreprocessingPipeline(object):
     def run(self, args):
         """
         Runs this preprocessing pipeline
+
         """
         clean(args.subj_id)
 
