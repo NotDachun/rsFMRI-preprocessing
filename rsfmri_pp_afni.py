@@ -41,7 +41,7 @@ class PreprocessingPipeline(object):
     def __init__(self, output_file="rsfmri_pp_afni_output.txt"):
         self.output_file = open(output_file, "w")
 
-    def record(text):
+    def record(self, text):
         """
         Prints to both console and the specified output file 
 
@@ -52,7 +52,7 @@ class PreprocessingPipeline(object):
         print(text)
         self.output_file.write(str(text) + "\n")
 
-    def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
+    def isclose(self, a, b, rel_tol=1e-09, abs_tol=0.0):
         """
         Checks if two floats are equal
 
@@ -66,7 +66,7 @@ class PreprocessingPipeline(object):
         """
         return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
-    def cpe_output(exception, text):
+    def cpe_output(self, exception, text):
         """
         Error message to be printed when a CalledProcessError is raised
 
@@ -79,7 +79,7 @@ class PreprocessingPipeline(object):
         record(exception.output)
         record(text)
 
-    def create_outdir(out_dir):
+    def create_outdir(self, out_dir):
         """
         Creates the output directory if it does not already exist. Intermediate
         directories will be created as well.
@@ -100,7 +100,7 @@ class PreprocessingPipeline(object):
         assert os.path.isdir(output_dir), "Output directory was not created"
         return output_dir
 
-    def run_SSwarper(out_dir, subj_id, anat, template):
+    def run_SSwarper(self, out_dir, subj_id, anat, template):
         """
         Runs AFNI's @SSwarper with the inputted parameters if it has not already been performed
 
@@ -149,7 +149,7 @@ class PreprocessingPipeline(object):
         assert os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}.aff12.1D".format(subj_id)))
         assert os.path.isfile(os.path.join(sswarper_outdir, "anatQQ.{}_WARP.nii".format(subj_id)))
 
-    def truncate_epi(epi, out_dir, volumes):
+    def truncate_epi(self, epi, out_dir, volumes):
         """
         Truncates a copy of EPI data to the inputted number of volumes. Places this
         copy in the passed output directory
@@ -195,7 +195,7 @@ class PreprocessingPipeline(object):
         assert (check_vol == volumes), "TCat EPI does not have the correct number of volumes"
         return epi
 
-    def set_gm_mask(rsproc):
+    def set_gm_mask(self, rsproc):
         """
         Modifies a RSproc file by supplying the grey matter mask as an input to the blur_in_mask
         function
@@ -214,7 +214,7 @@ class PreprocessingPipeline(object):
         with open(rsproc, "w") as file:
             file.write(filedata)
 
-    def generate_afni_proc(args, template):
+    def generate_afni_proc(self, args, template):
         """
         Generates the afni_proc.py script according to the inputted parameters
 
@@ -307,7 +307,7 @@ class PreprocessingPipeline(object):
 
         return afni_proc, name
 
-    def set_epi_tr(epi, tr):
+    def set_epi_tr(self, epi, tr):
         """
         Modifies the tr header information of the EPI data
 
@@ -333,7 +333,7 @@ class PreprocessingPipeline(object):
 
         assert (isclose(check_tr, tr)), "TR was not modified correctly"
 
-    def create_EM_snapshot(volreg_epi, subj_id, out_dir, template):
+    def create_EM_snapshot(self, volreg_epi, subj_id, out_dir, template):
         """
         Creates a snapshot to check for alignment between the processed epi and
         an inputted template
@@ -358,7 +358,7 @@ class PreprocessingPipeline(object):
         except subprocess.CalledProcessError as e:
             cpe_output(e, "Error creating the EPI on MNI registration snapshot")
 
-    def create_seed_based_network(epi, out_dir, seed):
+    def create_seed_based_network(self, epi, out_dir, seed):
         """
         Seed based analysis - Creates a correlation map based on the time course 
         of the seed region. Will create intermediate directories when saving to 
@@ -380,7 +380,7 @@ class PreprocessingPipeline(object):
         output_name = output_name[:output_name.find(".nii")]
         dc.save_output(correlation, header, output_name + "_DMNStaticCorr", out_dir)
 
-    def afni_to_nifti(afni_file, name=""):
+    def afni_to_nifti(self, afni_file, name=""):
         """
         Converts an AFNI file format (.HEAD/.BRIK) to NIFTI file format (.nii).
         Names the outputed NIFTI file if passed a name parameter
@@ -406,7 +406,7 @@ class PreprocessingPipeline(object):
         except subprocess.CalledProcessError as e:
             cpe_output(e, "Error converting file to NIFTI")
 
-    def move_to_outdir(out_dir, *args):
+    def move_to_outdir(self, out_dir, *args):
         """
         Moves any number of files into out_dir
 
@@ -420,7 +420,7 @@ class PreprocessingPipeline(object):
         for file in args:
             shutil.move(file, out_dir)
 
-    def clean(subj_id):
+    def clean(self, subj_id):
         """
         Removes previous {sub}.results directories from pwd
 
@@ -433,7 +433,7 @@ class PreprocessingPipeline(object):
             record("Clean - Removing {}".format(old_dir))
             shutil.rmtree(old_dir)
 
-    def run(args):
+    def run(self, args):
         """
         Runs this preprocessing pipeline
 
