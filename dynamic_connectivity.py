@@ -185,13 +185,8 @@ def calculate_dynam_corr(windows, window_length, overlap, seed_tc, data):
     for window in range(windows):
         win_lower = window * (window_length - overlap)
         win_upper = win_lower + window_length
+        print str(win_lower) + " " + str(win_upper)
         correlation[..., window] = pearson_2d(seed_tc[win_lower:win_upper], voxel_tc[:, win_lower:win_upper].T).reshape(data.shape[:-1])
-        print("window boundaries: " + str(win_lower) + " " + str(win_upper))        
-        print("seed_tc window")        
-        print(seed_tc[win_lower:win_upper])
-        print("voxel_tc window")
-        print(voxel_tc[700000, win_lower:win_upper])
-        voxel_test_tc = voxel_tc[700000, :]
     return correlation
     
 def calculate_static_corr(seed_tc, data):
@@ -228,11 +223,11 @@ if __name__ == "__main__":
     windows = calc_windows(args.window_length, args.overlap, data.shape[3])
     seed_tc = extract_seed_tc(seed, data)
     correlation = calculate_dynam_corr(windows, args.window_length, args.overlap, seed_tc, data)
-    correlation = calculate_static_corr(seed_tc, data)
+#    correlation = calculate_static_corr(seed_tc, data)
     z_matrix = corr_to_z(correlation)
     output_name = os.path.basename(args.processed_epi)[:-4]
-    save_output(correlation, header, output_name + "_DMNDynamCorrMaskave", args.output_dir)
-    save_output(z_matrix, header, output_name + "_DMNDynamZMaskave", args.output_dir)
+    save_output(correlation, header, output_name + "_DMNDynamCorr", args.output_dir)
+    save_output(z_matrix, header, output_name + "_DMNDynamZ", args.output_dir)
 
     end = timer()
     print("Time Elapsed: " + str(end - start) + " s")

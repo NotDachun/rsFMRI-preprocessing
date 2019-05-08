@@ -31,15 +31,16 @@ import dynamic_connectivity as dc
 from multiprocessing import cpu_count
 
 """
-PreprocessingPipeline is meant to preprocess rsFMRI data through the AFNI
+PreprocessingPipeline to preprocess rsFMRI data through the AFNI
 software package. 
 """
 class PreprocessingPipeline(object):
 
-    mni = "MNI152_T1_2mm_SSW.nii"
+    mni = "MNI152_T1_1mm_SSW.nii"
 
     def __init__(self, output_file="rsfmri_pp_afni_output.txt"):
         self.output_file = open(output_file, "w")
+        self.output_file_name = output_file
 
     def record(self, text):
         """
@@ -108,7 +109,7 @@ class PreprocessingPipeline(object):
                 out_dir (String): Path to the output directory
                 subj_id (String): Subject id
                 anat (String): Path to the anatomical data
-                mni (String): Path to the template to be used (Look at @SSWarper help page for more 
+                self.mni (String): Path to the template to be used (Look at @SSWarper help page for more 
                 information on templates)
         """
 
@@ -316,7 +317,8 @@ class PreprocessingPipeline(object):
                 tr (float): The time step
         """
 
-        assert (os.path.isfile(epi))
+        assert ((os.path.isfile(epi) or 
+                (os.path.isfile(epi + "HEAD") and os.path.isfile(epi + "BRIK"))))
         assert (tr > 0)
 
         self.record("Ensuring TR in EPI header info is correct.")
@@ -390,8 +392,10 @@ class PreprocessingPipeline(object):
                 name (String): Name of converted file
         """
 
-        assert (os.path.isfile(afni_file + "HEAD"))
-        assert (os.path.isfile(afni_file + "BRIK"))
+        print(os.getcwd())
+
+        assert (os.path.isfile(afni_file + "HEAD")), afni_file + "HEAD is not a file" 
+        assert (os.path.isfile(afni_file + "BRIK")), afni_file + "BRIK is not a file"
 
         self.record("Converting from AFNI to NIFTI")
         try:
@@ -418,6 +422,11 @@ class PreprocessingPipeline(object):
         assert (os.path.isdir(out_dir))
 
         for file in args:
+            if (os.path.isdir(file)):
+                shutil.rmtree(file)
+            elif (os.path.isfile(file)):
+                os.remove(file)
+                
             shutil.move(file, out_dir)
 
     def clean(self, subj_id):
@@ -440,37 +449,38 @@ class PreprocessingPipeline(object):
         """
         self.clean(args.subj_id)
 
-        os.environ['OMP_NUM_THREADS'] = args.cores
+        os.environ['OMP_NUM_THREADS'] = str(args.cores)
 
         # outdir = outdir/Processed/
         args.out_dir = self.create_outdir(args.out_dir)
         results_dir = "{}.results".format(args.subj_id)
-        afni_final = os.path.join(results_dir, "errts.{}.tproject+tlrc".format(subj_id))
+        afni_final = os.path.join(results_dir, "errts.{}.tproject+tlrc.".format(args.subj_id))
         result = os.path.join(args.out_dir, afni_final)
 
-        if (os.path.isfile(result + ".HEAD") and os.path.isfile(result + ".BRIK")
+        if (os.path.isfile(result + "HEAD") and os.path.isfile(result + "BRIK")
                 and not args.rerun):
             self.record("Data has already been preprocessed.")
             self.record("Results of preprocessing are the following files: ")
-            self.record(result + ".HEAD")
-            self.record(result + ".BRIK")
+            self.record("\t" + result + "HEAD")
+            self.record("\t" + result + "BRIK")
             self.record("Use flag -r/--rerun to override results and rerun the preprocessing")
             return
 
         else:
-            if os.path.isdir(args.out_dir):
-                self.record("Overriding and deleting previous 'Processed' directory.")
-                shutil.rmtree(args.out_dir)
-            os.mkdir(args.out_dir)
+            if os.path.isdir(results_dir):
+                self.record("Overriding and deleting previous results directory.")
+                shutil.rmtree(results_dir)
+
 
             if args.nl_reg:
-                self.run_SSwarper(args.out_dir, args.subj_id, args.anat, mni)
+                self.run_SSwarper(args.out_dir, args.subj_id, args.anat, self.mni)
             if args.volumes:
-                args.epi = self.truncate_epi()
+                args.epi = self.truncate_epi(args.epi, args.out_dir, args.volumes)
+                print(args.epi)
             if args.time_step:
                 self.set_epi_tr(args.epi, args.time_step)
 
-            afni_proc, name = self.generate_afni_proc(args, mni)
+            afni_proc, name = self.generate_afni_proc(args, self.mni)
             # Execute afni_proc.py, creates RSproc.$subj script
             try:
                 self.record(subprocess.check_output(afni_proc, stderr=subprocess.STDOUT))
@@ -483,7 +493,7 @@ class PreprocessingPipeline(object):
 
             # Execute RSproc.$subj
             try:
-                self.record(subprocess.check_output(["tcsh", "-xef", rsproc]), stderr=subprocess.STDOUT)
+                self.record(subprocess.check_output(["tcsh", "-xef", rsproc], stderr=subprocess.STDOUT))
             except subprocess.CalledProcessError as e:
                 self.cpe_output(e, "Preprocessing failed in RSproc")
 
@@ -492,4 +502,4 @@ class PreprocessingPipeline(object):
             shutil.move(name + ".nii", results_dir)
 
             self.record("Finished preprocessing, moving results to output directory")
-            self.move_to_outdir(args.out_dir, rsproc, file, results_dir)
+            self.move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)

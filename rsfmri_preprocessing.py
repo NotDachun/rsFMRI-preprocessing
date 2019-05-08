@@ -81,6 +81,10 @@ def parse_args(args):
 
     return result
 
+def run_multi_subject(pipeline, args, **kwargs):
+	if kwargs is not None:
+		pass
+
 
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
@@ -93,7 +97,7 @@ if __name__ == "__main__":
                     args.epi = e.strip()
                     args.anat = a.strip()
                     args.out_dir = o.strip()
-                    args.sub = s.strip()
+                    args.subj_id = s.strip()
                     pipeline.run(args)
         else:
             for e, a, o in zip(epi, anat, out_dir):
