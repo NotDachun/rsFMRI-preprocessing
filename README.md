@@ -4,7 +4,7 @@
 https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/background_install/install_instructs/index.html
 
 ### rsfmri_preprocessing.py 
-Creates a pipeline based on the supplied parameters and runs it on all subjects.
+Command line program that creates a pipeline based on the supplied parameters and runs it on all subjects.
 
 <pre>
 usage: rsfmri_preprocessing.py [-h] [-t TRs] [-d MM] [-b F F] [-v V] [-f MM]
