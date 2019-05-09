@@ -422,12 +422,15 @@ class PreprocessingPipeline(object):
         assert (os.path.isdir(out_dir))
 
         for file in args:
-            if (os.path.isdir(file)):
+            if os.path.isdir(os.path.join(out_dir, file)):
                 shutil.rmtree(file)
-            elif (os.path.isfile(file)):
+            elif os.path.isdir(os.path.join(out_dir, file)):
                 os.remove(file)
-                
-            shutil.move(file, out_dir)
+            
+            if os.path.exists(file):
+                shutil.move(file, out_dir)
+            else:
+                self.record(file + "does not exist")
 
     def clean(self, subj_id):
         """
