@@ -32,7 +32,7 @@ optional arguments:
   -c C, --cores C       number of cores supplied to 3dDeconvolve (default =
                         all cores)
   -s SUB, --subj_id SUB
-                        text file of paths (default = sub)
+                        text file of subject ids (default = sub)
   -T TS, --time_step TS
                         set the time step for bandpassing (default = ts in
                         header info
