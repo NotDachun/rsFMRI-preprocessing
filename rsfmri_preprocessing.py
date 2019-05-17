@@ -42,7 +42,7 @@ def parse_args(args):
     parser.add_argument("-c", "--cores", action="store", default=cpu_count(), type=int, metavar="C",
                         help="number of cores supplied to 3dDeconvolve (default = all cores)")
     parser.add_argument("-s", "--subj_id", action="store", default="sub", metavar="SUB",
-                        help="text file of paths (default = sub)")
+                        help="text file of subject ids (default = sub)")
     parser.add_argument("-T", "--time_step", action="store", default=0, type=float, metavar="TS",
                         help="set the time step for bandpassing (default = ts in header info")
 
