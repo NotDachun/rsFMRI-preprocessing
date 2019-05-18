@@ -3,6 +3,12 @@
 ### Preprocessing relies on AFNI. Install it at:
 https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/background_install/install_instructs/index.html
 
+
+## Usage
+
+1. Clone this respository (preprocessing is dependent on the templates and libraries within this repository)
+2. Run rsfmri_preprocessing.py while the repository is your pwd according to the usage below
+
 ### rsfmri_preprocessing.py 
 Command line program that creates a pipeline based on the supplied parameters and runs it on all subjects.
 
