@@ -43,9 +43,8 @@ class PreprocessingPipeline(object):
         self.output_file = open(output_file, "w")
         self.output_file_name = output_file
 
-    def set_output_file(self, output_file):
+    def new_outfile(self, output_file):
         self.output_file = open(output_file, "w")
-        self.output_file_name = output_file
 
     def record(self, text):
         """
