@@ -82,8 +82,12 @@ def parse_args(args):
     return result
 
 def run_multi_subject(pipeline, args, **kwargs):
-	if kwargs is not None:
-		pass
+    pipeline.new_outfile()
+    if kwargs is not None:
+        temp = vars(args)
+        for key, value in kwargs:
+            temp[key] = value.strip()
+            pipeline.run(args)
 
 
 if __name__ == "__main__":
@@ -94,14 +98,11 @@ if __name__ == "__main__":
         if not args.subj_id == "sub":
             with open(args.subj_id, "r") as sub:
                 for e, a, o, s in zip(epi, anat, out_dir, sub):
-                    args.epi = e.strip()
-                    args.anat = a.strip()
-                    args.out_dir = o.strip()
-                    args.subj_id = s.strip()
-                    pipeline.run(args)
+                    run_multi_subject(pipeline, args, epi=e, anat=a, out_dir=o, subj_id=s)
         else:
             for e, a, o in zip(epi, anat, out_dir):
-                args.epi = e.strip()
-                args.anat = a.strip()
-                args.out_dir = o.strip()
-                pipeline.run(args)
+                # args.epi = e.strip()
+                # args.anat = a.strip()
+                # args.out_dir = o.strip()
+                # pipeline.run(args)
+                run_multi_subject(pipeline, args, epi=e, anat=a, out_dir=o)

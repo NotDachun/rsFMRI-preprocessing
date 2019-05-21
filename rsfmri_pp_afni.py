@@ -37,8 +37,13 @@ software package.
 class PreprocessingPipeline(object):
 
     mni = "MNI152_T1_1mm_SSW.nii"
+    seed = "FIND_pCC.nii"
 
-    def __init__(self, output_file="rsfmri_pp_afni_output.txt"):
+    def __init__(self, output_file="preprocessing_output.txt"):
+        self.output_file = open(output_file, "w")
+        self.output_file_name = output_file
+
+    def set_output_file(self, output_file):
         self.output_file = open(output_file, "w")
         self.output_file_name = output_file
 
@@ -106,7 +111,7 @@ class PreprocessingPipeline(object):
         Runs AFNI's @SSwarper with the inputted parameters if it has not already been performed
 
         Parameters:
-                out_dir (String): Path to the output directory
+                out_dir (String): Path fto the output directory
                 subj_id (String): Subject id
                 anat (String): Path to the anatomical data
                 self.mni (String): Path to the template to be used (Look at @SSWarper help page for more 
@@ -392,8 +397,6 @@ class PreprocessingPipeline(object):
                 name (String): Name of converted file
         """
 
-        print(os.getcwd())
-
         assert (os.path.isfile(afni_file + "HEAD")), afni_file + "HEAD is not a file" 
         assert (os.path.isfile(afni_file + "BRIK")), afni_file + "BRIK is not a file"
 
@@ -501,8 +504,20 @@ class PreprocessingPipeline(object):
                 self.cpe_output(e, "Preprocessing failed in RSproc")
 
             # Rename and convert errts.tproject and move $sub.results
+            # self.afni_to_nifti(afni_final, name)
+            # shutil.move(name + ".nii", results_dir)
+
+            # self.record("Finished preprocessing, moving results to output directory")
+            # self.move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)
+
+            # Rename and convert errts.tproject and move $sub.results
             self.afni_to_nifti(afni_final, name)
+
+            self.create_seed_based_network(name, args.out_dir, self.seed)
             shutil.move(name + ".nii", results_dir)
 
-            self.record("Finished preprocessing, moving results to output directory")
-            self.move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)
+            self.create_EM_snapshot(os.path.join(results_dir, "pb02.{}.r01.volreg+tlrc.".format(args.subj_id)), 
+                args.subj_id, args.out_dir, self.mni)
+
+            record("Finished preprocessing, moving results to output directory")
+            move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)
