@@ -85,9 +85,9 @@ def run_multi_subject(pipeline, args, **kwargs):
     pipeline.new_outfile()
     if kwargs is not None:
         temp = vars(args)
-        for key, value in kwargs:
+        for key, value in kwargs.iteritems():
             temp[key] = value.strip()
-            pipeline.run(args)
+        pipeline.run(args)
 
 
 if __name__ == "__main__":

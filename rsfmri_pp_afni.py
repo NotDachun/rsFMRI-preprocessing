@@ -40,11 +40,11 @@ class PreprocessingPipeline(object):
     seed = "FIND_pCC.nii"
 
     def __init__(self, output_file="preprocessing_output.txt"):
-        self.output_file = open(output_file, "w")
+        self.output_file = None
         self.output_file_name = output_file
 
-    def new_outfile(self, output_file):
-        self.output_file = open(output_file, "w")
+    def new_outfile(self):
+        self.output_file = open(self.output_file_name, "w")
 
     def record(self, text):
         """
