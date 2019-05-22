@@ -101,8 +101,4 @@ if __name__ == "__main__":
                     run_multi_subject(pipeline, args, epi=e, anat=a, out_dir=o, subj_id=s)
         else:
             for e, a, o in zip(epi, anat, out_dir):
-                # args.epi = e.strip()
-                # args.anat = a.strip()
-                # args.out_dir = o.strip()
-                # pipeline.run(args)
                 run_multi_subject(pipeline, args, epi=e, anat=a, out_dir=o)

@@ -9,3 +9,6 @@ int_test/
 rsfmri_pp_afni_backup.py
 preprocessing_output.txt
 
+*_3T3.results
+RSproc.*
+*_output.txt

@@ -394,6 +394,8 @@ class PreprocessingPipeline(object):
         Parameter:
                 afni_file (String): Path to the file in AFNI format
                 name (String): Name of converted file
+        Returns:
+                name with nifti (.nii) extension
         """
 
         assert (os.path.isfile(afni_file + "HEAD")), afni_file + "HEAD is not a file" 
@@ -408,9 +410,12 @@ class PreprocessingPipeline(object):
                 command.extend(["-prefix", name])
             command.append(afni_file)
             self.record(subprocess.check_output(command, stderr=subprocess.STDOUT))
+            name = name + ".nii"
 
         except subprocess.CalledProcessError as e:
             self.cpe_output(e, "Error converting file to NIFTI")
+
+        return name
 
     def move_to_outdir(self, out_dir, *args):
         """
@@ -503,20 +508,13 @@ class PreprocessingPipeline(object):
                 self.cpe_output(e, "Preprocessing failed in RSproc")
 
             # Rename and convert errts.tproject and move $sub.results
-            # self.afni_to_nifti(afni_final, name)
-            # shutil.move(name + ".nii", results_dir)
-
-            # self.record("Finished preprocessing, moving results to output directory")
-            # self.move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)
-
-            # Rename and convert errts.tproject and move $sub.results
-            self.afni_to_nifti(afni_final, name)
+            name = self.afni_to_nifti(afni_final, name)
 
             self.create_seed_based_network(name, args.out_dir, self.seed)
-            shutil.move(name + ".nii", results_dir)
+            shutil.move(name, results_dir)
 
             self.create_EM_snapshot(os.path.join(results_dir, "pb02.{}.r01.volreg+tlrc.".format(args.subj_id)), 
                 args.subj_id, args.out_dir, self.mni)
 
-            record("Finished preprocessing, moving results to output directory")
-            move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)
+            self.record("Finished preprocessing, moving results to output directory")
+            self.move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)
