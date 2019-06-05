@@ -16,9 +16,6 @@ Rationale:
     -Ability to do unit testing
 
 ToDo:
-    -Test override ability
-
-    -Run preprocessing on multiple subjects
 """
 
 import argparse
@@ -260,6 +257,7 @@ class PreprocessingPipeline(object):
                           "-align_opts_aea", "-giant_move", "-cost", "lpc+zz",
                           "-volreg_align_to", "MIN_OUTLIER",
                           "-volreg_align_e2a",
+                          "-volreg_opts_vr", "-maxdisp1D", "volreg_disp.1D",
                           "-volreg_tlrc_warp",
                           "-tlrc_base", template,
                           "-volreg_warp_dxyz", str(args.dim_voxel)])
@@ -419,7 +417,7 @@ class PreprocessingPipeline(object):
 
     def move_to_outdir(self, out_dir, *args):
         """
-        Moves any number of files into out_dir
+        Moves any number of files into out_dir, removes and replaces files if they already exist
 
         Parameters:
                 *args (String): Path to files
@@ -430,9 +428,9 @@ class PreprocessingPipeline(object):
 
         for file in args:
             if os.path.isdir(os.path.join(out_dir, file)):
-                shutil.rmtree(file)
-            elif os.path.isdir(os.path.join(out_dir, file)):
-                os.remove(file)
+                shutil.rmtree(os.path.join(out_dir, file))
+            elif os.path.isfile(os.path.join(out_dir, file)):
+                os.remove(os.path.join(out_dir, file))
             
             if os.path.exists(file):
                 shutil.move(file, out_dir)

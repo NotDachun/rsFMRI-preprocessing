@@ -4,7 +4,7 @@
 # In[1]:
 
 
-import numpy as np
+#import numpy as np
 import math
 import matplotlib
 import matplotlib.pyplot as plt
