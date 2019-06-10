@@ -349,10 +349,10 @@ class PreprocessingPipeline(object):
                 template (String): Path to the template that was used for registration
         """
 
-        assert (os.path.isfile(volreg_epi + "HEAD"))
-        assert (os.path.isfile(volreg_epi + "BRIK"))
+        assert (os.path.isfile(volreg_epi + "HEAD") and os.path.isfile(volreg_epi + "BRIK"))
         assert (os.path.isdir(out_dir))
-        assert (os.path.isfile(template))
+        assert (os.path.isfile(template) or 
+                (os.path.isfile(template + "HEAD") and os.path.isfile(template + "BRIK")))
 
         try:
             # Equivalent to shell command: @snapshot_volreg $template $subj.results/pb03.$subj.r01.volreg+tlrc. $outdir/EM_$subj.jpg
@@ -513,6 +513,9 @@ class PreprocessingPipeline(object):
 
             self.create_EM_snapshot(os.path.join(results_dir, "pb02.{}.r01.volreg+tlrc.".format(args.subj_id)), 
                 args.subj_id, args.out_dir, self.mni)
+
+            self.create_EM_snapshot(os.path.join(results_dir, "pb02.{}.r01.volreg+tlrc.".format(args.subj_id)), 
+                args.subj_id, args.out_dir, os.path.join(results_dir, "anat_final.{}+tlrc.".format(args.subj_id)))
 
             self.record("Finished preprocessing, moving results to output directory")
             self.move_to_outdir(args.out_dir, rsproc, self.output_file_name, results_dir)
